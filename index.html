@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Work Hours</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --bg:#E9EDF2; --surface:#FFFFFF; --ink:#16223A; --muted:#5A6A80; --line:#CFD7E2;
+  --accent:#F2B705; --accent-ink:#16223A; --danger:#B3261E; --field:#F4F6F9;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1522; --surface:#182133; --ink:#E7ECF3; --muted:#9AA8BC; --line:#2B3850;
+    --accent:#F2B705; --accent-ink:#16223A; --danger:#FF8A80; --field:#111A29;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1522; --surface:#182133; --ink:#E7ECF3; --muted:#9AA8BC; --line:#2B3850;
+  --accent:#F2B705; --accent-ink:#16223A; --danger:#FF8A80; --field:#111A29;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 "Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:640px;margin:0 auto;padding:16px 14px 96px}
+.num,.cond{font-family:"Barlow Condensed","Arial Narrow",sans-serif}
+button,input,select{font:inherit;color:inherit}
+input{background:var(--field);border:1px solid var(--line);border-radius:8px;padding:10px 11px;width:100%;min-height:44px}
+input:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+button{cursor:pointer;border:0;border-radius:8px;min-height:44px;padding:0 14px;font-weight:600}
+.btn-main{background:var(--accent);color:var(--accent-ink)}
+.btn-line{background:transparent;border:1px solid var(--line)}
+.btn-text{background:transparent;padding:0 8px;color:var(--muted)}
+
+/* Top: name + period */
+.top{padding:6px 2px 14px}
+.name{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700;font-size:34px;line-height:1.1;background:transparent;border:0;border-bottom:2px solid var(--line);border-radius:0;padding:4px 0;min-height:auto}
+.name:focus-visible{outline:none;border-bottom-color:var(--accent)}
+.period{display:flex;gap:10px;align-items:end;margin-top:14px}
+.period>div{flex:1}
+
+/* Grand total strip */
+.grand{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:var(--bg);border-radius:12px;padding:14px 16px;margin-bottom:18px}
+.grand .lbl{font-size:14px;opacity:.8}
+.grand .big{font-size:34px;font-weight:700;line-height:1}
+.grand .dec{font-size:14px;opacity:.75;text-align:right}
+
+/* Firm */
+.firm{background:var(--surface);border-radius:12px;margin-bottom:16px;overflow:hidden;border-left:6px solid var(--accent)}
+.firm.moving{border-left-style:dashed}
+.firm-head{display:flex;justify-content:space-between;gap:12px;padding:14px 14px 10px}
+.firm-head h2{margin:0;font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:24px;font-weight:700;line-height:1.1;word-break:break-word}
+.kind{font-size:13px;color:var(--muted);margin-top:3px}
+.total{text-align:right;flex-shrink:0}
+.total b{display:block;font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:26px;line-height:1}
+.total span{font-size:13px;color:var(--muted)}
+.entries{list-style:none;margin:0;padding:0 14px}
+.entry{display:grid;grid-template-columns:1fr auto auto;gap:4px 10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.entry .d{font-weight:600}
+.entry .addr{grid-column:1/2;font-size:14px;color:var(--muted);word-break:break-word}
+.entry .t{font-size:14px;color:var(--muted)}
+.entry .h{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:20px;font-weight:600;text-align:right}
+.entry .x{grid-row:1/3;grid-column:3;min-height:40px;padding:0 10px;background:transparent;color:var(--muted);font-size:20px}
+.entry .x.arm{color:#fff;background:var(--danger);font-size:13px}
+.entry .main{display:contents}
+.entry.editing{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.empty{padding:6px 14px 12px;color:var(--muted);font-size:14px}
+.add{padding:12px 14px 14px;border-top:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid .full{grid-column:1/-1}
+.row-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.row-btns .btn-main{flex:1}
+.firm-foot{display:flex;justify-content:space-between;gap:8px;padding:0 14px 14px}
+
+.add-firm{width:100%;background:transparent;border:2px dashed var(--line);color:var(--muted);min-height:56px;margin-bottom:22px}
+.bottom{display:flex;flex-direction:column;gap:10px}
+.bottom .btn-main{min-height:52px;font-size:17px}
+.small-links{display:flex;justify-content:center;gap:6px;margin-top:6px}
+.welcome{background:var(--surface);border-radius:12px;padding:18px 16px;margin-bottom:16px;color:var(--muted)}
+.welcome strong{color:var(--ink)}
+
+dialog{border:0;border-radius:14px;padding:0;width:min(92vw,460px);background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(10,15,25,.55)}
+.dlg{padding:18px 16px}
+.dlg h3{margin:0 0 14px;font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:24px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 14px}
+.seg label{margin:0;border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--ink);font-size:15px;display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+.seg input{width:auto;min-height:auto;margin-top:4px;accent-color:var(--accent)}
+.seg label:has(input:checked){border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.seg small{display:block;color:var(--muted);font-size:12px}
+.field{margin-bottom:12px}
+.danger{color:var(--danger)}
+.sync{background:var(--surface);border-radius:12px;padding:14px;margin-bottom:18px}
+.sync-head{display:flex;align-items:center;gap:10px}
+.sync h2{margin:0;font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-size:22px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--line);flex-shrink:0}
+.dot.ok{background:#2E9E5B}.dot.wait{background:var(--accent)}.dot.err{background:var(--danger)}
+.sync p{margin:6px 0 0;color:var(--muted);font-size:15px}
+.sync a{color:var(--ink);font-weight:600;align-self:center;padding:0 8px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <label for="name">Your name</label>
+    <input id="name" class="name" placeholder="Write your name" autocomplete="name">
+    <div class="period">
+      <div>
+        <label for="month">Month to show</label>
+        <input id="month" type="month">
+      </div>
+      <button class="btn-line" id="allDates" type="button">All dates</button>
+    </div>
+  </div>
+
+  <div class="grand">
+    <div><div class="lbl" id="grandLbl">All firms</div><div class="big num" id="grandH">0h 00m</div></div>
+    <div class="dec" id="grandD">0.00 hours</div>
+  </div>
+
+  <div id="firms"></div>
+  <button class="add-firm" id="addFirm" type="button">+ Add a firm</button>
+
+  <section class="sync" id="nativeSync" aria-live="polite" hidden>
+    <div class="sync-head"><span class="dot" id="nDot"></span><h2>Backup</h2></div>
+    <p id="nStatus">Saving a copy on this phone…</p>
+    <div class="row-btns"><button class="btn-main" id="nSend" type="button">Send backup to Gmail or Drive</button></div>
+  </section>
+  <section class="sync" id="gmailSync" aria-live="polite">
+    <div class="sync-head"><span class="dot" id="syncDot"></span><h2>Gmail backup</h2></div>
+    <p id="syncStatus">Off. Your hours are saved on this phone only.</p>
+    <div class="row-btns">
+      <button class="btn-main" id="gmailOn" type="button">Turn on auto backup</button>
+      <button class="btn-line" id="gmailNow" type="button" hidden>Back up now</button>
+    </div>
+    <div class="row-btns">
+      <button class="btn-text" id="gmailRestore" type="button">Restore from Gmail</button>
+      <a id="gmailLink" target="_blank" rel="noopener" hidden>Open in Gmail</a>
+      <button class="btn-text" id="gmailOff" type="button" hidden>Turn off</button>
+    </div>
+  </section>
+
+  <div class="bottom">
+    <button class="btn-main" id="pdfAll" type="button">Make PDF of all firms</button>
+    <div class="small-links">
+      <button class="btn-text" id="backup" type="button">Save backup</button>
+      <button class="btn-text" id="restoreBtn" type="button">Restore backup</button>
+      <input type="file" id="restore" accept=".json,application/json" hidden>
+    </div>
+  </div>
+</div>
+
+<dialog id="firmDlg">
+  <form class="dlg" method="dialog" id="firmForm">
+    <h3 id="firmDlgTitle">New firm</h3>
+    <div class="field"><label for="fName">Firm name</label><input id="fName" required></div>
+    <label>Where do you work for this firm?</label>
+    <div class="seg">
+      <label><input type="radio" name="mode" value="fixed" checked><span>One fixed place<small>Same address every day</small></span></label>
+      <label><input type="radio" name="mode" value="moving"><span>Moving places<small>Write address each day</small></span></label>
+    </div>
+    <div class="field" id="fAddrWrap"><label for="fAddr">Fixed address</label><input id="fAddr" placeholder="Street, city"></div>
+    <div class="row-btns">
+      <button class="btn-main" value="save" id="fSave">Save firm</button>
+      <button class="btn-line" value="cancel" formnovalidate>Cancel</button>
+    </div>
+    <div class="row-btns"><button class="btn-text danger" type="button" id="fDelete" hidden>Delete this firm</button></div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const KEY='nanohours.v1';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,10);
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+let S=load();
+function load(){try{const r=localStorage.getItem(KEY);if(r){const o=JSON.parse(r);if(o&&Array.isArray(o.firms))return o}}catch(e){}return{name:'',firms:[]}}
+let ver=0;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save on this phone')}ver++;if(typeof scheduleBackup==='function')scheduleBackup()}
+
+const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m};
+function dur(e){let d=toMin(e.end)-toMin(e.start);if(d<=0)d+=1440;d-=(+e.brk||0);return Math.max(0,d)}
+const fmt=m=>`${Math.floor(m/60)}h ${pad(m%60)}m`;
+const dec=m=>(m/60).toFixed(2);
+function niceDate(s){const[y,m,d]=s.split('-').map(Number);const dt=new Date(y,m-1,d);return `${DAYS[dt.getDay()]} ${pad(d)}/${pad(m)}/${y}`}
+
+let month=today().slice(0,7);
+function periodLabel(){if(!month)return'All dates';const[y,m]=month.split('-');return `${MONTHS[+m-1]} ${y}`}
+function entriesFor(f){return f.entries.filter(e=>!month||e.date.startsWith(month)).sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start))}
+const firmMin=f=>entriesFor(f).reduce((s,e)=>s+dur(e),0);
+
+let editing={}; // firmId -> entryId
+let armed=null;
+
+function render(){
+  $('#name').value=S.name||'';
+  $('#month').value=month;
+  $('#allDates').textContent=month?'All dates':'This month';
+  const box=$('#firms');
+  if(!S.firms.length){
+    box.innerHTML=`<div class="welcome"><strong>Start by adding a firm.</strong><br>Choose "one fixed place" for a firm with the same address every day, or "moving places" if you write a new address each day.<br><br>Already have a backup? Tap "Restore from Gmail" below.</div>`;
+  }else box.innerHTML=S.firms.map(firmHTML).join('');
+  let g=0;S.firms.forEach(f=>g+=firmMin(f));
+  $('#grandLbl').textContent=`All firms, ${periodLabel()}`;
+  $('#grandH').textContent=fmt(g);
+  $('#grandD').textContent=`${dec(g)} hours`;
+  $('#pdfAll').hidden=S.firms.length<1;
+}
+
+function firmHTML(f){
+  const es=entriesFor(f), mins=es.reduce((s,e)=>s+dur(e),0);
+  const moving=f.mode==='moving';
+  const ed=editing[f.id]?f.entries.find(e=>e.id===editing[f.id]):null;
+  const addrs=[...new Set(f.entries.map(e=>e.address).filter(Boolean))];
+  const rows=es.map(e=>`
+    <li class="entry${ed&&ed.id===e.id?' editing':''}" data-entry="${e.id}">
+      <div class="d" data-act="edit">${niceDate(e.date)}</div>
+      <div class="h" data-act="edit">${fmt(dur(e))}</div>
+      <button class="x${armed===e.id?' arm':''}" data-act="del" aria-label="Delete entry">${armed===e.id?'Delete?':'×'}</button>
+      <div class="t" data-act="edit" style="grid-column:1/3">${e.start} to ${e.end}${+e.brk?`, break ${e.brk} min`:''}${moving&&e.address?`<br><span class="addr">${esc(e.address)}</span>`:''}</div>
+    </li>`).join('');
+  return `<section class="firm${moving?' moving':''}" data-firm="${f.id}">
+    <div class="firm-head">
+      <div><h2>${esc(f.name)}</h2>
+        <div class="kind">${moving?'Moving places':'Fixed place'+(f.address?`: ${esc(f.address)}`:'')}</div></div>
+      <div class="total"><b>${fmt(mins)}</b><span>${dec(mins)} h, ${es.length} day${es.length===1?'':'s'}</span></div>
+    </div>
+    ${rows?`<ol class="entries">${rows}</ol>`:`<div class="empty">No hours in ${periodLabel().toLowerCase()==='all dates'?'any date':periodLabel()} yet.</div>`}
+    <form class="add" data-form="${f.id}">
+      <div class="grid">
+        <div class="full"><label>Date</label><input type="date" name="date" required value="${ed?ed.date:today()}"></div>
+        ${moving?`<div class="full"><label>Address of today's work</label><input name="address" list="dl-${f.id}" placeholder="Street, city" value="${ed?esc(ed.address||''):''}"><datalist id="dl-${f.id}">${addrs.map(a=>`<option value="${esc(a)}">`).join('')}</datalist></div>`:''}
+        <div><label>Start</label><input type="time" name="start" required value="${ed?ed.start:''}"></div>
+        <div><label>End</label><input type="time" name="end" required value="${ed?ed.end:''}"></div>
+        <div class="full"><label>Break in minutes (optional)</label><input type="number" name="brk" min="0" step="5" inputmode="numeric" placeholder="0" value="${ed&&+ed.brk?ed.brk:''}"></div>
+      </div>
+      <div class="row-btns">
+        <button class="btn-main">${ed?'Save changes':'Add hours'}</button>
+        ${ed?'<button class="btn-line" type="button" data-act="cancel-edit">Cancel</button>':''}
+      </div>
+    </form>
+    <div class="firm-foot">
+      <button class="btn-line" type="button" data-act="pdf">PDF for ${esc(f.name.length>16?f.name.slice(0,15)+'…':f.name)}</button>
+      <button class="btn-text" type="button" data-act="edit-firm">Edit firm</button>
+    </div>
+  </section>`;
+}
+
+/* ---- events ---- */
+$('#name').addEventListener('input',e=>{S.name=e.target.value;save()});
+$('#month').addEventListener('change',e=>{month=e.target.value;render()});
+$('#allDates').addEventListener('click',()=>{month=month?'':today().slice(0,7);render()});
+
+$('#firms').addEventListener('submit',e=>{
+  e.preventDefault();
+  const form=e.target, f=S.firms.find(x=>x.id===form.dataset.form); if(!f)return;
+  const d=Object.fromEntries(new FormData(form));
+  if(!d.date||!d.start||!d.end){toast('Write date, start and end');return}
+  if(d.start===d.end){toast('Start and end are the same time');return}
+  const data={date:d.date,start:d.start,end:d.end,brk:Math.max(0,parseInt(d.brk)||0),address:(d.address||'').trim()};
+  const id=editing[f.id];
+  if(id){Object.assign(f.entries.find(x=>x.id===id),data);delete editing[f.id];toast('Changes saved')}
+  else{f.entries.push({id:uid(),...data});toast(`Added ${fmt(dur(data))}`)}
+  if(month&&!data.date.startsWith(month))toast('Saved. It is in another month, change the month to see it.');
+  save();render();
+});
+
+$('#firms').addEventListener('click',e=>{
+  const act=e.target.closest('[data-act]')?.dataset.act; if(!act)return;
+  const sec=e.target.closest('[data-firm]'), f=S.firms.find(x=>x.id===sec.dataset.firm);
+  const li=e.target.closest('[data-entry]');
+  if(act==='del'){
+    const id=li.dataset.entry;
+    if(armed===id){f.entries=f.entries.filter(x=>x.id!==id);if(editing[f.id]===id)delete editing[f.id];armed=null;save();toast('Entry deleted')}
+    else{armed=id;setTimeout(()=>{if(armed===id){armed=null;render()}},3000)}
+    render();return;
+  }
+  armed=null;
+  if(act==='edit'){editing[f.id]=li.dataset.entry;render();document.querySelector(`[data-form="${f.id}"]`)?.scrollIntoView({block:'center'});return}
+  if(act==='cancel-edit'){delete editing[f.id];render();return}
+  if(act==='edit-firm'){openFirm(f);return}
+  if(act==='pdf'){makePdf([f]);return}
+});
+
+/* ---- firm dialog ---- */
+const dlg=$('#firmDlg'); let dlgFirm=null, delArmed=false;
+function syncMode(){$('#fAddrWrap').hidden=dlg.querySelector('input[name=mode]:checked').value!=='fixed'}
+dlg.querySelectorAll('input[name=mode]').forEach(r=>r.addEventListener('change',syncMode));
+function openFirm(f){
+  dlgFirm=f||null;delArmed=false;
+  $('#firmDlgTitle').textContent=f?'Edit firm':'New firm';
+  $('#fName').value=f?f.name:'';$('#fAddr').value=f?f.address||'':'';
+  dlg.querySelector(`input[name=mode][value=${f?f.mode:'fixed'}]`).checked=true;
+  $('#fDelete').hidden=!f;$('#fDelete').textContent='Delete this firm';
+  syncMode();dlg.showModal();
+}
+$('#addFirm').addEventListener('click',()=>openFirm(null));
+$('#firmForm').addEventListener('submit',e=>{
+  if(e.submitter&&e.submitter.value==='cancel')return;
+  const name=$('#fName').value.trim(); if(!name){e.preventDefault();return}
+  const mode=dlg.querySelector('input[name=mode]:checked').value, address=mode==='fixed'?$('#fAddr').value.trim():'';
+  if(dlgFirm)Object.assign(dlgFirm,{name,mode,address});
+  else S.firms.push({id:uid(),name,mode,address,entries:[]});
+  save();render();
+});
+$('#fDelete').addEventListener('click',()=>{
+  if(!delArmed){delArmed=true;$('#fDelete').textContent=`Tap again: delete firm and all its hours`;return}
+  S.firms=S.firms.filter(x=>x!==dlgFirm);save();dlg.close();render();toast('Firm deleted');
+});
+
+/* ---- saving files ---- */
+const NATIVE=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform());
+const NP=NATIVE?window.Capacitor.Plugins:null;
+const blobToB64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(b)});
+async function nativeShare(filename,data){
+  const enc=typeof data==='string'?b64(data):await blobToB64(data);
+  const w=await NP.Filesystem.writeFile({path:filename,data:enc,directory:'CACHE'});
+  await NP.Share.share({title:filename,files:[w.uri],dialogTitle:'Send or save'});
+}
+let dl=null;
+try{window.claude?.use?.('downloads')?.then(d=>{dl=d})}catch(e){}
+async function deliver(filename,data){
+  if(NATIVE){try{await nativeShare(filename,data);return true}catch(e){const m=String(e&&e.message||e);if(!/cancel/i.test(m))toast('Could not share: '+m);return false}}
+  if(!dl){toast('Open this page inside the Claude app to save files');return}
+  try{await dl.save({filename,data});toast('Saved');return true}
+  catch(err){if(err&&err.code==='declined')return;toast(err&&err.code==='rate_limited'?'Wait a moment and try again':'This file could not be saved here')}
+}
+const safe=s=>(s||'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'')||'hours';
+
+/* ---- PDF ---- */
+function makePdf(list){
+  if(!window.jspdf){toast('PDF tool is still loading, try again');return}
+  const {jsPDF}=window.jspdf, doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210,H=297,M=14,IW=W-2*M; let y=M, grand=0;
+  const ensure=h=>{if(y+h>H-16){doc.addPage();y=M}};
+  doc.setFont('helvetica','bold');doc.setFontSize(20);doc.text('Work hours',M,y+6);y+=13;
+  doc.setFontSize(11);doc.setFont('helvetica','normal');
+  doc.text(`Name: ${S.name||'-'}`,M,y);y+=6;
+  doc.text(`Period: ${periodLabel()}`,M,y);y+=4;
+  doc.setDrawColor(22,34,58);doc.setLineWidth(.6);doc.line(M,y,W-M,y);y+=8;
+
+  list.forEach(f=>{
+    const es=entriesFor(f), moving=f.mode==='moving';
+    const fixedCols=[{k:'date',l:'Date',w:30},{k:'start',l:'Start',w:18},{k:'end',l:'End',w:18},{k:'brk',l:'Break',w:18},{k:'hm',l:'Time',w:22,r:1},{k:'dh',l:'Hours',w:18,r:1}];
+    const used=fixedCols.reduce((s,c)=>s+c.w,0);
+    const cols=moving?[fixedCols[0],{k:'address',l:'Address',w:IW-used},...fixedCols.slice(1)]:fixedCols.map((c,i)=>i===0?{...c,w:c.w+IW-used}:c);
+    ensure(30);
+    doc.setFont('helvetica','bold');doc.setFontSize(14);doc.text(f.name,M,y);y+=6;
+    doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(90,106,128);
+    doc.text(moving?'Moving places':`Fixed place${f.address?': '+f.address:''}`,M,y);doc.setTextColor(0);y+=5;
+    const head=()=>{doc.setFillColor(22,34,58);doc.rect(M,y,IW,7,'F');doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(9.5);
+      let x=M;cols.forEach(c=>{doc.text(c.l,c.r?x+c.w-2:x+2,y+4.8,{align:c.r?'right':'left'});x+=c.w});doc.setTextColor(0);doc.setFont('helvetica','normal');y+=7};
+    head();
+    let tot=0;
+    if(!es.length){doc.setFontSize(10);doc.text('No hours in this period.',M+2,y+5);y+=8}
+    es.forEach((e,i)=>{
+      const m=dur(e);tot+=m;
+      const v={date:niceDate(e.date),start:e.start,end:e.end,brk:+e.brk?`${e.brk} min`:'-',hm:fmt(m),dh:dec(m),address:e.address||'-'};
+      doc.setFontSize(9.5);
+      const lines=moving?doc.splitTextToSize(v.address,cols[1].w-4):[''];
+      const rh=Math.max(7,lines.length*4.2+2.8);
+      if(y+rh>H-16){doc.addPage();y=M;head()}
+      if(i%2){doc.setFillColor(240,243,247);doc.rect(M,y,IW,rh,'F')}
+      let x=M;cols.forEach(c=>{
+        if(c.k==='address')doc.text(lines,x+2,y+4.8);
+        else doc.text(String(v[c.k]),c.r?x+c.w-2:x+2,y+4.8,{align:c.r?'right':'left'});
+        x+=c.w});
+      y+=rh;
+    });
+    grand+=tot;
+    ensure(10);
+    doc.setDrawColor(22,34,58);doc.setLineWidth(.4);doc.line(M,y,W-M,y);
+    doc.setFont('helvetica','bold');doc.setFontSize(11);
+    doc.text(`Total ${f.name}`,M+2,y+6);
+    doc.text(`${fmt(tot)}   (${dec(tot)} h)`,W-M-2,y+6,{align:'right'});
+    y+=16;
+  });
+
+  if(list.length>1){
+    ensure(14+list.length*7);
+    doc.setFillColor(242,183,5);doc.rect(M,y,IW,10,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(12);
+    doc.text('Total all firms',M+3,y+6.8);
+    doc.text(`${fmt(grand)}   (${dec(grand)} h)`,W-M-3,y+6.8,{align:'right'});
+    y+=14;doc.setFont('helvetica','normal');doc.setFontSize(10);
+    list.forEach(f=>{const m=firmMin(f);doc.text(f.name,M+3,y);doc.text(`${fmt(m)}  (${dec(m)} h)`,W-M-3,y,{align:'right'});y+=6});
+  }
+  const pages=doc.getNumberOfPages();
+  for(let p=1;p<=pages;p++){doc.setPage(p);doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(120);
+    doc.text(`${S.name||''}  ${periodLabel()}`,M,H-8);doc.text(`Page ${p} of ${pages}`,W-M,H-8,{align:'right'});doc.setTextColor(0)}
+  const per=month||'all-dates';
+  const fname=list.length===1?`Hours_${safe(list[0].name)}_${safe(S.name)}_${per}.pdf`:`Hours_all_firms_${safe(S.name)}_${per}.pdf`;
+  deliver(fname,doc.output('blob'));
+}
+$('#pdfAll').addEventListener('click',()=>makePdf(S.firms));
+
+/* ---- backup ---- */
+$('#backup').addEventListener('click',()=>deliver(`work-hours-backup-${today()}.json`,JSON.stringify(S,null,1)));
+$('#restoreBtn').addEventListener('click',()=>$('#restore').click());
+$('#restore').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);if(!o||!Array.isArray(o.firms))throw 0;S=o;save();render();toast('Backup restored')}catch(_){toast('This file is not a work hours backup')}};
+  r.readAsText(file);e.target.value='';
+});
+
+/* ---- Gmail backup (works offline: waits and backs up when online) ---- */
+const META='nanohours.meta', SUBJ='Work Hours backup', MARK_A='=====BACKUP DATA, DO NOT EDIT=====', MARK_B='=====END=====';
+let meta=(()=>{try{return JSON.parse(localStorage.getItem(META))||{}}catch(e){return{}}})();
+function saveMeta(){try{localStorage.setItem(META,JSON.stringify(meta))}catch(e){}}
+let mcp=null, busy=false, btimer=null, gErr='', restoreArmed=false;
+try{window.claude?.use?.('mcp')?.then(m=>{mcp=m;renderSync();if(m&&meta.auto&&meta.dirty&&navigator.onLine)backup(false)})}catch(e){}
+function scheduleBackup(){if(NATIVE){clearTimeout(btimer);btimer=setTimeout(localSave,1500);return}meta.dirty=true;saveMeta();renderSync();if(!meta.auto)return;clearTimeout(btimer);btimer=setTimeout(()=>backup(false),6000)}
+addEventListener('online',()=>{renderSync();if(meta.auto&&meta.dirty)backup(false)});
+addEventListener('offline',renderSync);
+const b64=str=>{const by=new TextEncoder().encode(str);let bin='';for(let i=0;i<by.length;i+=0x8000)bin+=String.fromCharCode.apply(null,by.subarray(i,i+0x8000));return btoa(bin)};
+const unb64=t=>new TextDecoder().decode(Uint8Array.from(atob(t),c=>c.charCodeAt(0)));
+const stamp=t=>{const d=new Date(t);return `${pad(d.getDate())}/${pad(d.getMonth()+1)} at ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+function draftContent(){
+  const json=JSON.stringify(S), enc=b64(json), n=S.firms.reduce((a,f)=>a+f.entries.length,0);
+  const lines=enc.match(/.{1,76}/g)||[];
+  return{subject:SUBJ,
+    body:`Work Hours app backup. Keep this draft, do not send it.\nName: ${S.name||'-'}\nSaved: ${stamp(Date.now())}\nFirms: ${S.firms.length}, entries: ${n}\n\n${MARK_A}\n${lines.join('\n')}\n${MARK_B}\n`,
+    attachments:[{content:enc,filename:'work-hours-backup.json',mimeType:'application/json'}]};
+}
+async function findDrafts(){
+  const r=await mcp.callTool('Gmail','list_drafts',{query:`subject:"${SUBJ}"`,pageSize:10,view:'DRAFT_VIEW_FULL'},{cache:false});
+  const ds=((r.payload&&r.payload.drafts)||[]).filter(d=>(d.plaintextBody||'').includes(MARK_A));
+  return ds.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
+function errText(e){
+  switch(e&&e.code){
+    case 'needs_reauth':return'Gmail needs to be reconnected. Go to Claude Settings, then Connectors.';
+    case 'server_not_connected':return'Gmail is not connected. Add it in Claude Settings, then Connectors.';
+    case 'selection_required':return'Choose which Gmail account to use when Claude asks.';
+    case 'not_in_manifest':return'Gmail is turned off for this page. Allow it in the page permissions.';
+    case 'blocked_by_policy':case 'approval_required':return'Gmail is blocked for this page by your account settings.';
+    case 'server_unavailable':case 'upstream_error':return'Gmail did not answer. It will try again after your next change, or tap Back up now.';
+    case 'tool_error':return'Gmail refused the backup: '+(e.message||'unknown reason');
+    default:return'Gmail backup is not available right now.';
+  }
+}
+async function backup(manual){
+  if(busy)return;
+  if(!mcp){gErr='Gmail backup works when this page is open in the Claude app.';renderSync();return}
+  if(!navigator.onLine){renderSync();if(manual)toast('You are offline. It will back up when you are online.');return}
+  busy=true;gErr='';renderSync();
+  const startVer=ver;
+  try{
+    const c=draftContent(); let res=null;
+    if(meta.draftId){
+      try{res=await mcp.callTool('Gmail','update_draft',{draftId:meta.draftId,...c})}
+      catch(e){if(e&&e.code==='tool_error')meta.draftId=null;else throw e}
+    }
+    if(!meta.draftId){
+      const ds=await findDrafts();
+      if(ds[0]){meta.draftId=ds[0].id;res=await mcp.callTool('Gmail','update_draft',{draftId:meta.draftId,...c})}
+      else res=await mcp.callTool('Gmail','create_draft',c);
+    }
+    const p=(res&&res.payload)||{};
+    if(p.id)meta.draftId=p.id; if(p.viewUrl)meta.viewUrl=p.viewUrl;
+    meta.last=Date.now(); if(ver===startVer)meta.dirty=false; saveMeta();
+    if(manual)toast('Backed up to Gmail');
+  }catch(e){gErr=errText(e)}
+  finally{busy=false;renderSync();if(meta.auto&&meta.dirty&&!gErr){clearTimeout(btimer);btimer=setTimeout(()=>backup(false),6000)}}
+}
+async function restoreGmail(){
+  if(!mcp){toast('Open this page in the Claude app to use Gmail');return}
+  if(!navigator.onLine){toast('You need internet to restore from Gmail');return}
+  if(S.firms.length&&!restoreArmed){restoreArmed=true;$('#gmailRestore').textContent='Tap again: replace hours on this phone';setTimeout(()=>{restoreArmed=false;renderSync()},4000);return}
+  restoreArmed=false;busy=true;gErr='';renderSync();
+  try{
+    const ds=await findDrafts();
+    if(!ds.length){toast('No Work Hours backup found in your Gmail drafts');return}
+    const body=ds[0].plaintextBody, a=body.indexOf(MARK_A)+MARK_A.length, b=body.indexOf(MARK_B,a);
+    const o=JSON.parse(unb64(body.slice(a,b<0?undefined:b).replace(/[^A-Za-z0-9+/=]/g,'')));
+    if(!o||!Array.isArray(o.firms))throw{code:'bad'};
+    S=o;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}
+    meta.draftId=ds[0].id;meta.viewUrl=ds[0].viewUrl||meta.viewUrl;meta.auto=true;meta.dirty=false;meta.last=Date.parse(ds[0].date)||Date.now();saveMeta();
+    render();toast('Hours restored from Gmail');
+  }catch(e){if(e&&e.code&&e.code!=='bad')gErr=errText(e);else toast('The Gmail backup could not be read')}
+  finally{busy=false;renderSync()}
+}
+function renderSync(){
+  const dot=$('#syncDot'), st=$('#syncStatus'); let cls='', txt;
+  if(busy){cls='wait';txt='Working with Gmail…'}
+  else if(gErr){cls='err';txt=gErr}
+  else if(!meta.auto){txt='Off. Your hours are saved on this phone only.'}
+  else if(!navigator.onLine){cls='wait';txt=meta.dirty?'Offline. Your changes are safe on this phone and will back up when you are online.':'Offline. Everything was already backed up.'}
+  else if(meta.dirty){cls='wait';txt='New changes will back up in a few seconds.'}
+  else{cls='ok';txt=meta.last?`Backed up ${stamp(meta.last)}. A draft named "${SUBJ}" in your Gmail keeps your hours.`:'On.'}
+  dot.className='dot '+cls; st.textContent=txt;
+  $('#gmailOn').hidden=!!meta.auto; $('#gmailNow').hidden=!meta.auto; $('#gmailOff').hidden=!meta.auto;
+  if(!restoreArmed)$('#gmailRestore').textContent='Restore from Gmail';
+  const l=$('#gmailLink'); if(meta.viewUrl&&meta.auto){l.href=meta.viewUrl;l.hidden=false}else l.hidden=true;
+  [$('#gmailOn'),$('#gmailNow'),$('#gmailRestore')].forEach(b=>b.disabled=busy);
+}
+$('#gmailOn').addEventListener('click',()=>{meta.auto=true;meta.dirty=true;saveMeta();backup(true)});
+$('#gmailNow').addEventListener('click',()=>backup(true));
+$('#gmailOff').addEventListener('click',()=>{meta.auto=false;gErr='';saveMeta();clearTimeout(btimer);renderSync();toast('Gmail backup turned off')});
+$('#gmailRestore').addEventListener('click',restoreGmail);
+/* ---- APK: automatic copy on phone + send to Gmail/Drive ---- */
+async function localSave(){
+  const data=JSON.stringify(S,null,1);
+  try{await NP.Filesystem.writeFile({path:'WorkHours/work-hours-backup.json',data,directory:'DOCUMENTS',encoding:'utf8',recursive:true});meta.localWhere='Documents/WorkHours'}
+  catch(e){try{await NP.Filesystem.writeFile({path:'work-hours-backup.json',data,directory:'DATA',encoding:'utf8',recursive:true});meta.localWhere='inside the app'}catch(_){meta.localWhere=''}}
+  meta.localAt=Date.now();saveMeta();renderNative();
+}
+function renderNative(){
+  const has=S.firms.some(f=>f.entries.length), old=!meta.sentAt||Date.now()-meta.sentAt>7*864e5;
+  let t=meta.localAt&&meta.localWhere?`Every change is saved automatically on this phone (${meta.localWhere}).`:'Your hours are saved on this phone.';
+  t+=meta.sentAt?` Last sent to Gmail or Drive ${stamp(meta.sentAt)}.`:'';
+  if(has&&old)t+=' Send a backup to Gmail or Drive at least once a week, so your hours are safe if the phone is lost.';
+  $('#nStatus').textContent=t;$('#nDot').className='dot '+(has&&old?'wait':'ok');
+}
+if(NATIVE){
+  $('#gmailSync').hidden=true;$('#nativeSync').hidden=false;$('#backup').hidden=true;
+  $('#nSend').addEventListener('click',async()=>{if(await deliver(`work-hours-backup-${today()}.json`,JSON.stringify(S,null,1))){meta.sentAt=Date.now();saveMeta();renderNative()}});
+  renderNative();localSave();
+}else renderSync();
+
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2600)}
+render();
+</script>
+</body>
+</html>
